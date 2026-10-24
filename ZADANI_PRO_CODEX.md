@@ -24,4 +24,4 @@ Udržuj webovou aplikaci „Svatomartinské putování“ v repozitáři `Blovak
 
 ## Před nasazením
 
-Zdrojové ID je `1jG4mLIO_Suk0x8Kqk-eZRIJ7nGcxXwtzfFzl-RUCE0I`. Vytvoř samostatný Firestore projekt, nasaď pravidla a Apps Script, nastav `FIRESTORE_PROJECT_ID` a `AUTH_PEPPER`, doplň veřejnou URL do `config.js`, ověř tok e-mailu a průchod skutečnou trasou. Publikování hostingu a Apps Scriptu je samostatný provozní krok.
+Zdrojové ID je `1jG4mLIO_Suk0x8Kqk-eZRIJ7nGcxXwtzfFzl-RUCE0I`. Samostatný Firestore projekt `svatomartinske-putovani` a databáze `(default)` v regionu `europe-central2` jsou vytvořené; produkční pravidla zakazují přímý klientský přístup. Nasaď Apps Script, nastav `FIRESTORE_PROJECT_ID=svatomartinske-putovani` a `AUTH_PEPPER`, doplň veřejnou URL do `config.js`, ověř tok e-mailu a průchod skutečnou trasou. Publikování hostingu a Apps Scriptu je samostatný provozní krok.
