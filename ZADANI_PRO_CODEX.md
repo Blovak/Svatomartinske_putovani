@@ -10,7 +10,8 @@ Udržuj webovou aplikaci „Svatomartinské putování“ v repozitáři `Blovak
 - Body pocházejí z [tabulky Data](https://docs.google.com/spreadsheets/d/1jG4mLIO_Suk0x8Kqk-eZRIJ7nGcxXwtzfFzl-RUCE0I/edit), list `GPS body`, sloupce `Poloha` a `Popis`. Souřadnice mají tvar `49.9699433N, 14.6600078E`. Neplatné a prázdné řádky nevykresluj. Zdrojová tabulka je jen pro čtení.
 - Na mapě zobraz všechny platné neprázdné řádky zdrojové tabulky, viditelnou atribuci OSM, polohu uživatele a kruh přesnosti GPS. Po zamítnutí oprávnění ukaž srozumitelný stav.
 - Nabídku „Potvrdit návštěvu“ ukaž pouze pro čerstvé měření (max. 15 s), pokud `vzdálenost + přesnost GPS ≤ 20 m`. Backend před zápisem nezávisle přepočítá vzdálenost a zkontroluje stáří měření (max. 30 s), přesnost a relaci. Zabraň duplicitním návštěvám.
-- Nezapisuj tajné údaje do repozitáře ani do frontendu. `POINTS_SPREADSHEET_ID`, `STORAGE_SPREADSHEET_ID` a tajný `AUTH_PEPPER` patří do Script Properties. Veřejná URL Apps Scriptu patří do `config.js`. Provozní tabulka musí být jiná než zdrojová.
+- Uživatelé, kódy, relace a návštěvy patří do samostatného Google Cloud Firestore projektu, nikoli do zdrojového Google Sheetu. Přímý přístup klienta do Firestore zakaž pravidly; server používá OAuth/IAM.
+- Nezapisuj tajné údaje do repozitáře ani do frontendu. `POINTS_SPREADSHEET_ID`, `FIRESTORE_PROJECT_ID` a tajný `AUTH_PEPPER` patří do Script Properties. Veřejná URL Apps Scriptu patří do `config.js`.
 - Udrž přístupné formuláře, stavové zprávy a rozvržení pro mobil. Nevyžaduj instalaci aplikace.
 
 ## Akceptační kritéria
@@ -23,4 +24,4 @@ Udržuj webovou aplikaci „Svatomartinské putování“ v repozitáři `Blovak
 
 ## Před nasazením
 
-Zdrojové ID je `1jG4mLIO_Suk0x8Kqk-eZRIJ7nGcxXwtzfFzl-RUCE0I`. Vytvoř oddělenou provozní tabulku, nasaď Apps Script, nastav obě ID a `AUTH_PEPPER`, doplň veřejnou URL do `config.js`, ověř tok e-mailu a průchod skutečnou trasou. Publikování hostingu a Apps Scriptu je samostatný provozní krok.
+Zdrojové ID je `1jG4mLIO_Suk0x8Kqk-eZRIJ7nGcxXwtzfFzl-RUCE0I`. Vytvoř samostatný Firestore projekt, nasaď pravidla a Apps Script, nastav `FIRESTORE_PROJECT_ID` a `AUTH_PEPPER`, doplň veřejnou URL do `config.js`, ověř tok e-mailu a průchod skutečnou trasou. Publikování hostingu a Apps Scriptu je samostatný provozní krok.

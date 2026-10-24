@@ -1,11 +1,6 @@
 // Samostatný backend. Povinné Script Properties:
-// POINTS_SPREADSHEET_ID, STORAGE_SPREADSHEET_ID, AUTH_PEPPER.
-const HEADERS = {
-  Users: ['UserId', 'Email', 'CreatedAt', 'LastLoginAt'],
-  AuthCodes: ['EmailHash', 'CodeHash', 'ExpiresAt', 'Attempts', 'RequestedAt', 'UsedAt'],
-  Sessions: ['TokenHash', 'UserId', 'Email', 'ExpiresAt', 'RevokedAt'],
-  Visits: ['UserId', 'PointId', 'VisitedAt', 'DistanceM', 'AccuracyM', 'RequestId']
-};
+// POINTS_SPREADSHEET_ID, FIRESTORE_PROJECT_ID, AUTH_PEPPER.
+// Firestore projekt musí být samostatný pro tuto aplikaci.
 const OTP_TTL = 10 * 60 * 1000;
 const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 const RADIUS_M = 20;
@@ -33,24 +28,12 @@ function fail_(error) { return { status:'ERROR', error:error }; }
 function settings_() {
   const props = PropertiesService.getScriptProperties();
   const pointsId = props.getProperty('POINTS_SPREADSHEET_ID');
-  const storageId = props.getProperty('STORAGE_SPREADSHEET_ID');
+  const projectId = props.getProperty('FIRESTORE_PROJECT_ID');
   const pepper = props.getProperty('AUTH_PEPPER');
-  if (!pointsId || !storageId || pointsId === storageId || !pepper || pepper.length < 32) {
-    throw new Error('Chybí oddělené ID zdrojové a provozní tabulky nebo silný AUTH_PEPPER.');
+  if (!pointsId || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId || '') || !pepper || pepper.length < 32) {
+    throw new Error('Chybí POINTS_SPREADSHEET_ID, FIRESTORE_PROJECT_ID nebo silný AUTH_PEPPER.');
   }
-  return { pointsId:pointsId, storageId:storageId, pepper:pepper };
-}
-function book_() { return SpreadsheetApp.openById(settings_().storageId); }
-function sheet_(name) {
-  const book = book_();
-  const sheet = book.getSheetByName(name) || book.insertSheet(name);
-  if (sheet.getLastRow() === 0) sheet.appendRow(HEADERS[name]);
-  return sheet;
-}
-function rows_(name) {
-  const sheet = sheet_(name);
-  const values = sheet.getDataRange().getValues();
-  return { sheet:sheet, rows:values.slice(1).map((values, index) => ({ number:index + 2, values:values })) };
+  return { pointsId:pointsId, projectId:projectId, pepper:pepper };
 }
 function hmac_(value) {
   const bytes = Utilities.computeHmacSha256Signature(String(value), settings_().pepper);
@@ -70,7 +53,6 @@ function randomCode_() {
   const value = (((bytes[0] & 255) * 16777216) + ((bytes[1] & 255) << 16) + ((bytes[2] & 255) << 8) + (bytes[3] & 255)) >>> 0;
   return String(value % 1000000).padStart(6, '0');
 }
-function findBy_(rows, index, value) { return rows.find(row => String(row.values[index]) === String(value)); }
 function requestCode_(p) {
   const email = email_(p.email);
   if (!validEmail_(email)) return fail_('INVALID_EMAIL');
@@ -82,14 +64,14 @@ function requestCode_(p) {
     const bucket = 'otp-global:' + Math.floor(Date.now() / 60000);
     const count = Number(cache.get(bucket) || 0);
     if (count >= 20) return fail_('TOO_MANY_REQUESTS');
-    const data = rows_('AuthCodes');
     const id = hmac_('email:' + email);
-    const row = findBy_(data.rows, 0, id);
-    if (row && Date.now() - new Date(row.values[4]).getTime() < 60000) return fail_('TOO_MANY_REQUESTS');
+    const previous = fsGet_('authCodes/' + id);
+    if (previous && Date.now() - new Date(previous.requestedAt).getTime() < 60000) return fail_('TOO_MANY_REQUESTS');
     code = randomCode_();
-    const values = [id, hmac_('otp:' + email + ':' + code), new Date(Date.now() + OTP_TTL), 0, new Date(), ''];
-    if (row) data.sheet.getRange(row.number, 1, 1, values.length).setValues([values]);
-    else data.sheet.appendRow(values);
+    fsSet_('authCodes/' + id, {
+      codeHash:hmac_('otp:' + email + ':' + code),
+      expiresAt:new Date(Date.now() + OTP_TTL), attempts:0, requestedAt:new Date(), usedAt:null
+    });
     cache.put(bucket, String(count + 1), 120);
   } finally { lock.releaseLock(); }
   MailApp.sendEmail({ to:email, subject:'Ověřovací kód – Svatomartinské putování', body:'Váš kód je: ' + code + '\nPlatí 10 minut. Pokud jste o něj nežádali, zprávu ignorujte.' });
@@ -100,46 +82,61 @@ function verifyCode_(p) {
   if (!validEmail_(email) || !/^\d{6}$/.test(code)) return fail_('INVALID_CODE');
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
-    const auth = rows_('AuthCodes');
-    const row = findBy_(auth.rows, 0, hmac_('email:' + email));
-    if (!row || row.values[5]) return fail_('INVALID_CODE');
-    if (new Date(row.values[2]).getTime() < Date.now()) return fail_('CODE_EXPIRED');
-    if (Number(row.values[3]) >= 5) return fail_('TOO_MANY_ATTEMPTS');
-    if (!safeEqual_(row.values[1], hmac_('otp:' + email + ':' + code))) {
-      auth.sheet.getRange(row.number, 4).setValue(Number(row.values[3]) + 1);
+    const emailId = hmac_('email:' + email);
+    const auth = fsGet_('authCodes/' + emailId);
+    if (!auth || auth.usedAt) return fail_('INVALID_CODE');
+    if (new Date(auth.expiresAt).getTime() < Date.now()) return fail_('CODE_EXPIRED');
+    if (Number(auth.attempts) >= 5) return fail_('TOO_MANY_ATTEMPTS');
+    if (!safeEqual_(auth.codeHash, hmac_('otp:' + email + ':' + code))) {
+      auth.attempts = Number(auth.attempts) + 1;
+      fsSet_('authCodes/' + emailId, clean_(auth));
       return fail_('INVALID_CODE');
     }
-    auth.sheet.getRange(row.number, 6).setValue(new Date());
-    const users = rows_('Users');
-    let user = findBy_(users.rows, 1, email);
-    let userId;
-    if (user) { userId = String(user.values[0]); users.sheet.getRange(user.number, 4).setValue(new Date()); }
-    else { userId = Utilities.getUuid(); users.sheet.appendRow([userId, email, new Date(), new Date()]); }
+    const userId = hmac_('user:' + email);
+    const user = fsGet_('users/' + userId);
     const token = randomToken_();
-    sheet_('Sessions').appendRow([hmac_('session:' + token), userId, email, new Date(Date.now() + SESSION_TTL), '']);
+    const now = new Date();
+    fsCommit_([
+      fsWriteSet_('authCodes/' + emailId, Object.assign(clean_(auth), { usedAt:now }), { updateTime:auth.__updateTime }),
+      fsWriteSet_('users/' + userId, { email:email, createdAt:user ? user.createdAt : now, lastLoginAt:now }, user ? null : { exists:false }),
+      fsWriteSet_('sessions/' + hmac_('session:' + token), {
+        userId:userId, email:email, expiresAt:new Date(Date.now() + SESSION_TTL), revokedAt:null
+      }, { exists:false })
+    ]);
     return ok_({ sessionToken:token, email:email });
   } finally { lock.releaseLock(); }
 }
 function session_(token) {
-  if (!token || String(token).length > 300) return null;
-  const data = rows_('Sessions');
-  const row = findBy_(data.rows, 0, hmac_('session:' + token));
-  if (!row || row.values[4] || new Date(row.values[3]).getTime() < Date.now()) return null;
-  return { userId:String(row.values[1]), email:String(row.values[2]), row:row, sheet:data.sheet };
+  if (typeof token !== 'string' || token.length < 40 || token.length > 200) return null;
+  const tokenHash = hmac_('session:' + token);
+  const session = fsGet_('sessions/' + tokenHash);
+  if (!session || session.revokedAt || new Date(session.expiresAt).getTime() < Date.now()) return null;
+  if (!validEmail_(email_(session.email)) || !/^[a-f0-9]{64}$/.test(session.userId || '')) return null;
+  return { userId:session.userId, email:email_(session.email), session:session, tokenHash:tokenHash };
 }
 function points_() {
-  const source = SpreadsheetApp.openById(settings_().pointsId).getSheetByName('GPS body');
-  if (!source) throw new Error('Ve zdrojové tabulce chybí list GPS body.');
-  const lastRow = source.getLastRow();
-  if (lastRow < 2) return [];
-  const header = source.getRange(1, 1, 1, 2).getDisplayValues()[0];
+  const values = sheetValues_();
+  if (!values.length) return [];
+  const header = values[0];
   if (header[0] !== 'Poloha' || header[1] !== 'Popis') throw new Error('Neplatné záhlaví GPS body.');
-  const values = source.getRange(2, 1, lastRow - 1, 2).getDisplayValues();
   const ids = {};
-  return values.map(v => parsePoint_(v)).filter(p => {
+  return values.slice(1).map(v => parsePoint_(v)).filter(p => {
     if (!p || ids[p.id]) return false;
     ids[p.id] = true; return true;
   });
+}
+function sheetValues_() {
+  const range = encodeURIComponent("'GPS body'!A1:B1000");
+  const url = 'https://sheets.googleapis.com/v4/spreadsheets/' +
+    encodeURIComponent(settings_().pointsId) + '/values/' + range;
+  const response = UrlFetchApp.fetch(url, {
+    method:'get',
+    headers:{ Authorization:'Bearer ' + ScriptApp.getOAuthToken() },
+    muteHttpExceptions:true
+  });
+  const status = response.getResponseCode();
+  if (status < 200 || status >= 300) throw new Error('Sheets HTTP ' + status);
+  return JSON.parse(response.getContentText()).values || [];
 }
 function parsePoint_(row) {
   const position = String(row[0] || '').trim();
@@ -154,8 +151,8 @@ function parsePoint_(row) {
 }
 function bootstrap_(p) {
   const user = session_(p.sessionToken); if (!user) return fail_('UNAUTHORIZED');
-  const visits = rows_('Visits').rows.filter(r => String(r.values[0]) === user.userId).map(r => String(r.values[1]));
-  return ok_({ email:user.email, points:points_(), visits:Array.from(new Set(visits)) });
+  const visits = fsList_('users/' + user.userId + '/visits').map(v => v.pointId);
+  return ok_({ email:user.email, points:points_(), visits:visits });
 }
 function distance_(a,b) {
   const rad = Math.PI / 180, lat1 = a.lat * rad, lat2 = b.lat * rad;
@@ -175,16 +172,104 @@ function visit_(p) {
   if (distance + accuracy > RADIUS_M) return fail_('OUT_OF_RANGE');
   const requestId = String(p.requestId || '');
   if (!/^[a-f0-9-]{36}$/.test(requestId)) return fail_('INVALID_REQUEST');
-  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  const path = 'users/' + user.userId + '/visits/' + hmac_('visit:' + point.id);
+  if (fsGet_(path)) return fail_('ALREADY_VISITED');
   try {
-    const visits = rows_('Visits');
-    if (visits.rows.some(r => String(r.values[0]) === user.userId && String(r.values[1]) === point.id)) return fail_('ALREADY_VISITED');
-    visits.sheet.appendRow([user.userId, point.id, new Date(), Math.round(distance*10)/10, accuracy, requestId]);
+    fsCommit_([fsWriteSet_(path, {
+      pointId:point.id, visitedAt:new Date(), distanceM:Math.round(distance*10)/10,
+      accuracyM:accuracy, requestId:requestId
+    }, { exists:false })]);
     return ok_();
-  } finally { lock.releaseLock(); }
+  } catch (error) {
+    if (error.status === 409 || error.status === 412) return fail_('ALREADY_VISITED');
+    throw error;
+  }
 }
 function logout_(p) {
   const user = session_(p.sessionToken); if (!user) return ok_();
-  user.sheet.getRange(user.row.number, 5).setValue(new Date());
+  fsSet_('sessions/' + user.tokenHash, Object.assign(clean_(user.session), { revokedAt:new Date() }));
   return ok_();
+}
+
+function fsBase_() {
+  return 'https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(settings_().projectId) +
+    '/databases/(default)/documents';
+}
+function fsRequest_(method, url, payload, allowMissing) {
+  const options = {
+    method:method,
+    headers:{ Authorization:'Bearer ' + ScriptApp.getOAuthToken() },
+    muteHttpExceptions:true
+  };
+  if (payload !== undefined) {
+    options.contentType = 'application/json';
+    options.payload = JSON.stringify(payload);
+  }
+  const response = UrlFetchApp.fetch(url, options);
+  const status = response.getResponseCode();
+  if (allowMissing && status === 404) return null;
+  if (status < 200 || status >= 300) {
+    const error = new Error('Firestore HTTP ' + status + ': ' + response.getContentText().slice(0, 500));
+    error.status = status; throw error;
+  }
+  const text = response.getContentText();
+  return text ? JSON.parse(text) : {};
+}
+function fsGet_(path) {
+  const doc = fsRequest_('get', fsBase_() + '/' + path, undefined, true);
+  return doc ? fsDecodeDoc_(doc) : null;
+}
+function fsSet_(path, data) { fsRequest_('patch', fsBase_() + '/' + path, { fields:fsFields_(data) }); }
+function fsList_(path) {
+  const all = []; let pageToken = '';
+  do {
+    let url = fsBase_() + '/' + path + '?pageSize=500';
+    if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+    const result = fsRequest_('get', url);
+    (result.documents || []).forEach(doc => all.push(fsDecodeDoc_(doc)));
+    pageToken = result.nextPageToken || '';
+  } while (pageToken);
+  return all;
+}
+function fsCommit_(writes) { fsRequest_('post', fsBase_() + ':commit', { writes:writes }); }
+function fsWriteSet_(path, data, precondition) {
+  const write = {
+    update:{
+      name:fsBase_().replace('https://firestore.googleapis.com/v1/', '') + '/' + path,
+      fields:fsFields_(data)
+    }
+  };
+  if (precondition) write.currentDocument = precondition;
+  return write;
+}
+function fsFields_(data) {
+  const fields = {};
+  Object.keys(data).forEach(key => { fields[key] = fsValue_(data[key]); });
+  return fields;
+}
+function fsValue_(value) {
+  if (value === null || value === undefined) return { nullValue:null };
+  if (value instanceof Date) return { timestampValue:value.toISOString() };
+  if (typeof value === 'number') return Number.isInteger(value) ? { integerValue:String(value) } : { doubleValue:value };
+  if (typeof value === 'boolean') return { booleanValue:value };
+  return { stringValue:String(value) };
+}
+function fsDecodeDoc_(doc) {
+  const data = {};
+  Object.keys(doc.fields || {}).forEach(key => {
+    const value = doc.fields[key];
+    if ('stringValue' in value) data[key] = value.stringValue;
+    else if ('timestampValue' in value) data[key] = value.timestampValue;
+    else if ('integerValue' in value) data[key] = Number(value.integerValue);
+    else if ('doubleValue' in value) data[key] = Number(value.doubleValue);
+    else if ('booleanValue' in value) data[key] = value.booleanValue;
+    else data[key] = null;
+  });
+  data.__updateTime = doc.updateTime;
+  return data;
+}
+function clean_(data) {
+  const copy = Object.assign({}, data);
+  delete copy.__updateTime;
+  return copy;
 }
