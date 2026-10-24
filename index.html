@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#263d36">
+  <meta name="description" content="Mapa zastavení Svatomartinského putování">
+  <title>Svatomartinské putování</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="./style.css">
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script defer src="./config.js"></script>
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><div><small>Podzimní cesta</small><strong>Svatomartinské putování</strong></div></div><button id="logout" class="quiet" hidden>Odhlásit</button></header>
+  <main>
+    <section class="intro"><div><p class="eyebrow">Vyrazte po stopách svatého Martina</p><h1>Každé zastavení má svůj příběh.</h1><p>Najděte místa na mapě. Až budete dost blízko a poloha bude přesná, můžete návštěvu potvrdit.</p></div><div class="progress"><span id="progress-count">0 / 0</span><small>navštívených míst</small></div></section>
+    <div id="status" role="status" aria-live="polite"></div>
+    <section id="setup" class="notice" hidden><h2>Je potřeba doplnit připojení</h2><p>Správce musí nastavit adresu Apps Scriptu v souboru <code>config.js</code> a ID tabulky v jeho nastavení. Postup je v README.</p></section>
+    <section id="auth" class="auth card" hidden>
+      <div id="email-step"><h2>Začněte ověřením e-mailu</h2><p>Pošleme vám šestimístný jednorázový kód.</p><form id="email-form"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" maxlength="254" required><button type="submit">Poslat kód</button></form></div>
+      <div id="code-step" hidden><h2>Zadejte ověřovací kód</h2><p>Kód platí 10 minut.</p><form id="code-form"><label for="code">Šestimístný kód</label><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required><button type="submit">Ověřit</button></form><button id="change-email" class="quiet">Změnit e-mail</button></div>
+    </section>
+    <section id="content" hidden><div class="layout"><div class="map-wrap card"><div class="map-heading"><div><h2>Mapa zastavení</h2><p id="location-info">Čekám na polohu…</p></div><button id="locate" class="secondary">Moje poloha</button></div><div id="map" aria-label="Mapa míst putování"></div><p class="map-foot">Poloha slouží k nabídce potvrzení. Přesnost GPS se může měnit.</p></div><aside class="side"><div class="card"><div class="section-heading"><h2>Zastavení</h2><span id="point-count"></span></div><div id="points"></div></div></aside></div></section>
+  </main>
+  <footer>Mapová data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. Pro zobrazení mapy je potřeba internet.</footer>
+</body></html>
