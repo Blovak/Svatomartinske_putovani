@@ -1,6 +1,6 @@
-// Samostatný backend. Povinné Script Properties: SPREADSHEET_ID, AUTH_PEPPER.
+// Samostatný backend. Povinné Script Properties:
+// POINTS_SPREADSHEET_ID, STORAGE_SPREADSHEET_ID, AUTH_PEPPER.
 const HEADERS = {
-  Points: ['Id', 'Name', 'Description', 'Latitude', 'Longitude', 'Active'],
   Users: ['UserId', 'Email', 'CreatedAt', 'LastLoginAt'],
   AuthCodes: ['EmailHash', 'CodeHash', 'ExpiresAt', 'Attempts', 'RequestedAt', 'UsedAt'],
   Sessions: ['TokenHash', 'UserId', 'Email', 'ExpiresAt', 'RevokedAt'],
@@ -32,12 +32,15 @@ function ok_(more) { return Object.assign({ status:'OK' }, more || {}); }
 function fail_(error) { return { status:'ERROR', error:error }; }
 function settings_() {
   const props = PropertiesService.getScriptProperties();
-  const id = props.getProperty('SPREADSHEET_ID');
+  const pointsId = props.getProperty('POINTS_SPREADSHEET_ID');
+  const storageId = props.getProperty('STORAGE_SPREADSHEET_ID');
   const pepper = props.getProperty('AUTH_PEPPER');
-  if (!id || !pepper || pepper.length < 32) throw new Error('Chybí SPREADSHEET_ID nebo silný AUTH_PEPPER.');
-  return { id:id, pepper:pepper };
+  if (!pointsId || !storageId || pointsId === storageId || !pepper || pepper.length < 32) {
+    throw new Error('Chybí oddělené ID zdrojové a provozní tabulky nebo silný AUTH_PEPPER.');
+  }
+  return { pointsId:pointsId, storageId:storageId, pepper:pepper };
 }
-function book_() { return SpreadsheetApp.openById(settings_().id); }
+function book_() { return SpreadsheetApp.openById(settings_().storageId); }
 function sheet_(name) {
   const book = book_();
   const sheet = book.getSheetByName(name) || book.insertSheet(name);
@@ -125,15 +128,29 @@ function session_(token) {
   return { userId:String(row.values[1]), email:String(row.values[2]), row:row, sheet:data.sheet };
 }
 function points_() {
-  const values = rows_('Points').rows;
+  const source = SpreadsheetApp.openById(settings_().pointsId).getSheetByName('GPS body');
+  if (!source) throw new Error('Ve zdrojové tabulce chybí list GPS body.');
+  const lastRow = source.getLastRow();
+  if (lastRow < 2) return [];
+  const header = source.getRange(1, 1, 1, 2).getDisplayValues()[0];
+  if (header[0] !== 'Poloha' || header[1] !== 'Popis') throw new Error('Neplatné záhlaví GPS body.');
+  const values = source.getRange(2, 1, lastRow - 1, 2).getDisplayValues();
   const ids = {};
-  return values.map(row => {
-    const v = row.values, lat = Number(String(v[3]).replace(',', '.')), lng = Number(String(v[4]).replace(',', '.'));
-    return { id:String(v[0]).trim(), name:String(v[1]).trim(), description:String(v[2] || '').trim(), lat:lat, lng:lng, active:String(v[5]).toLowerCase() };
-  }).filter(p => {
-    if (!p.id || ids[p.id] || !p.name || !Number.isFinite(p.lat) || !Number.isFinite(p.lng) || Math.abs(p.lat) > 90 || Math.abs(p.lng) > 180) return false;
-    ids[p.id] = true; return p.active === 'true' || p.active === 'ano' || p.active === '1';
-  }).map(p => ({ id:p.id, name:p.name, description:p.description, lat:p.lat, lng:p.lng }));
+  return values.map(v => parsePoint_(v)).filter(p => {
+    if (!p || ids[p.id]) return false;
+    ids[p.id] = true; return true;
+  });
+}
+function parsePoint_(row) {
+  const position = String(row[0] || '').trim();
+  const name = String(row[1] || '').trim();
+  const match = position.match(/^(\d{1,2}(?:\.\d+)?)\s*([NS])\s*,\s*(\d{1,3}(?:\.\d+)?)\s*([EW])$/i);
+  if (!match || !name) return null;
+  const lat = Number(match[1]) * (match[2].toUpperCase() === 'S' ? -1 : 1);
+  const lng = Number(match[3]) * (match[4].toUpperCase() === 'W' ? -1 : 1);
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  const id = 'gps-' + lat.toFixed(7) + '-' + lng.toFixed(7);
+  return { id:id, name:name, description:'', lat:lat, lng:lng };
 }
 function bootstrap_(p) {
   const user = session_(p.sessionToken); if (!user) return fail_('UNAUTHORIZED');

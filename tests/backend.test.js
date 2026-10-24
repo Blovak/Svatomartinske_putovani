@@ -20,6 +20,14 @@ context.points_ = () => [{ id:'bod-1', lat:49, lng:14 }];
 let writes = 0;
 context.rows_ = () => ({ rows:[], sheet:{ appendRow() { writes++; } } });
 
+test('souřadnice ze zdrojové tabulky se načtou do mapového bodu', () => {
+  const point = context.parsePoint_(['49.9699433N, 14.6600078E', 'Na Žlabku 246']);
+  assert.equal(point.lat, 49.9699433);
+  assert.equal(point.lng, 14.6600078);
+  assert.equal(point.name, 'Na Žlabku 246');
+  assert.equal(context.parsePoint_(['neplatné', 'Bod']), null);
+});
+
 test('server přijme přesnou čerstvou polohu', () => {
   assert.equal(visit().status, 'OK');
   assert.equal(writes, 1);
