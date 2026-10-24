@@ -1,8 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Pouze pro samostatný projekt této aplikace. Veřejný klient nepřistupuje přímo.
-    // Apps Script REST používá OAuth/IAM a musí mít odpovídající oprávnění.
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function validVisit(pointId) {
+      let v = request.resource.data;
+      let p = get(/databases/$(database)/documents/points/$(pointId)).data;
+      let latM = (v.lat - p.lat) * 111195;
+      let lngM = (v.lng - p.lng) * p.lonMPerDeg;
+      let remaining = 20 - v.accuracyM;
+      return v.keys().hasOnly(['pointId', 'visitedAt', 'measuredAt', 'lat', 'lng', 'accuracyM'])
+        && v.keys().hasAll(['pointId', 'visitedAt', 'measuredAt', 'lat', 'lng', 'accuracyM'])
+        && v.pointId == pointId
+        && v.visitedAt == request.time
+        && v.measuredAt is timestamp
+        && v.measuredAt <= request.time + duration.value(2, 's')
+        && v.measuredAt >= request.time - duration.value(30, 's')
+        && v.lat is number && v.lng is number && v.accuracyM is number
+        && v.lat >= -90 && v.lat <= 90 && v.lng >= -180 && v.lng <= 180
+        && v.accuracyM >= 0 && v.accuracyM <= 20
+        && latM * latM + lngM * lngM <= remaining * remaining;
+    }
+    match /points/{pointId} {
+      allow read: if verified();
+      allow write: if false;
+    }
+    match /users/{uid}/visits/{pointId} {
+      allow read: if verified() && request.auth.uid == uid;
+      allow create: if verified() && request.auth.uid == uid
+        && exists(/databases/$(database)/documents/points/$(pointId))
+        && validVisit(pointId);
+      allow update, delete: if false;
+    }
     match /{document=**} {
       allow read, write: if false;
     }

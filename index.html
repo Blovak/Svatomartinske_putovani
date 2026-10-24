@@ -17,10 +17,10 @@
   <main>
     <section class="intro"><div><p class="eyebrow">Vyrazte po stopách svatého Martina</p><h1>Každé zastavení má svůj příběh.</h1><p>Najděte místa na mapě. Až budete dost blízko a poloha bude přesná, můžete návštěvu potvrdit.</p></div><div class="progress"><span id="progress-count">0 / 0</span><small>navštívených míst</small></div></section>
     <div id="status" role="status" aria-live="polite"></div>
-    <section id="setup" class="notice" hidden><h2>Je potřeba doplnit připojení</h2><p>Správce musí nastavit adresu Apps Scriptu v souboru <code>config.js</code> a ID tabulky v jeho nastavení. Postup je v README.</p></section>
+    <section id="setup" class="notice" hidden><h2>Je potřeba doplnit připojení</h2><p>Správce musí nastavit Firebase v souboru <code>config.js</code>. Postup je v README.</p></section>
     <section id="auth" class="auth card" hidden>
-      <div id="email-step"><h2>Začněte ověřením e-mailu</h2><p>Pošleme vám šestimístný jednorázový kód.</p><form id="email-form"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" maxlength="254" required><button type="submit">Poslat kód</button></form></div>
-      <div id="code-step" hidden><h2>Zadejte ověřovací kód</h2><p>Kód platí 10 minut.</p><form id="code-form"><label for="code">Šestimístný kód</label><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required><button type="submit">Ověřit</button></form><button id="change-email" class="quiet">Změnit e-mail</button></div>
+      <div id="email-step"><h2>Začněte ověřením e-mailu</h2><p>Pošleme vám přihlašovací odkaz.</p><form id="email-form"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" maxlength="254" required><button type="submit">Poslat odkaz</button></form></div>
+      <div id="link-step" hidden><h2>Dokončete přihlášení</h2><p>Zadejte e-mail, na který přišel přihlašovací odkaz.</p><form id="link-form"><label for="link-email">E-mail</label><input id="link-email" type="email" autocomplete="email" maxlength="254" required><button type="submit">Přihlásit se</button></form></div>
     </section>
     <section id="content" hidden><div class="layout"><div class="map-wrap card"><div class="map-heading"><div><h2>Mapa zastavení</h2><p id="location-info">Čekám na polohu…</p></div><button id="locate" class="secondary">Moje poloha</button></div><div id="map" aria-label="Mapa míst putování"></div><p class="map-foot">Poloha slouží k nabídce potvrzení. Přesnost GPS se může měnit.</p></div><aside class="side"><div class="card"><div class="section-heading"><h2>Zastavení</h2><span id="point-count"></span></div><div id="points"></div></div></aside></div></section>
   </main>

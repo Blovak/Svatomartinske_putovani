@@ -1,27 +1,21 @@
 # Zadání pro Codex: Svatomartinské putování
 
-## Cíl
+Udržuj mobilní web v repozitáři `Blovak/Svatomartinske_putovani`. Uživatel se ověří jednorázovým e-mailovým odkazem Firebase Authentication, vidí místa na mapě OpenStreetMap a svou polohu. Přihlašovací princip navazuje na ověření vlastnictví e-mailu v `Putovani_Svetice`, ale nepřebírá jeho účty, tajné údaje ani backend.
 
-Udržuj webovou aplikaci „Svatomartinské putování“ v repozitáři `Blovak/Svatomartinske_putovani`. Účastník se ověří e-mailem, vidí zastavení na mapě OpenStreetMap a svou GPS polohu. Návštěvu místa může potvrdit pouze z jeho blízkosti.
+## Data a chování
 
-## Zdroje a pravidla
+- Zdroj GPS je [Google Sheet](https://docs.google.com/spreadsheets/d/1jG4mLIO_Suk0x8Kqk-eZRIJ7nGcxXwtzfFzl-RUCE0I/edit), list `GPS body`, sloupce `Poloha` a `Popis`. Soukromý Apps Script načítá platné řádky a synchronizuje `points/{id}` do Firestore každou hodinu. Zdroj je pouze pro čtení. Apps Script nemá veřejný webový endpoint.
+- Mapa zobrazuje všechna synchronizovaná místa, aktuální polohu a kruh přesnosti. U odmítnuté geolokace zobrazuje srozumitelnou zprávu.
+- Tlačítko potvrzení je dostupné jen pro polohu mladší než 15 sekund, když `vzdálenost + přesnost ≤ 20 m`. Firestore pravidla nezávisle kontrolují přihlášení, vlastnictví, bod, stáří do 30 s a vzdálenost s přesností. Opakovaný zápis a změnu návštěvy odmítají.
+- Návštěvy jsou v `users/{uid}/visits/{pointId}`. Jiný uživatel je nesmí číst. Přesné souřadnice návštěvy jsou citlivé osobní údaje; dokumentujte uchování a mazání.
+- Firebase web config jsou veřejné identifikátory. Nikdy neukládej soukromé klíče, tokeny nebo oprávnění správce do webu či repozitáře.
 
-- Autentizace se řídí principem `Blovak/Putovani_Svetice`: serverem zaslaný jednorázový e-mailový kód, omezené pokusy, hashované relace, ochrana dat na serveru. Nekopíruj produkční konfiguraci, identitu uživatelů ani tajné údaje původní aplikace.
-- Body pocházejí z [tabulky Data](https://docs.google.com/spreadsheets/d/1jG4mLIO_Suk0x8Kqk-eZRIJ7nGcxXwtzfFzl-RUCE0I/edit), list `GPS body`, sloupce `Poloha` a `Popis`. Souřadnice mají tvar `49.9699433N, 14.6600078E`. Neplatné a prázdné řádky nevykresluj. Zdrojová tabulka je jen pro čtení.
-- Na mapě zobraz všechny platné neprázdné řádky zdrojové tabulky, viditelnou atribuci OSM, polohu uživatele a kruh přesnosti GPS. Po zamítnutí oprávnění ukaž srozumitelný stav.
-- Nabídku „Potvrdit návštěvu“ ukaž pouze pro čerstvé měření (max. 15 s), pokud `vzdálenost + přesnost GPS ≤ 20 m`. Backend před zápisem nezávisle přepočítá vzdálenost a zkontroluje stáří měření (max. 30 s), přesnost a relaci. Zabraň duplicitním návštěvám.
-- Uživatelé, kódy, relace a návštěvy patří do samostatného Google Cloud Firestore projektu, nikoli do zdrojového Google Sheetu. Přímý přístup klienta do Firestore zakaž pravidly; server používá OAuth/IAM.
-- Nezapisuj tajné údaje do repozitáře ani do frontendu. `POINTS_SPREADSHEET_ID`, `FIRESTORE_PROJECT_ID` a tajný `AUTH_PEPPER` patří do Script Properties. Veřejná URL Apps Scriptu patří do `config.js`.
-- Udrž přístupné formuláře, stavové zprávy a rozvržení pro mobil. Nevyžaduj instalaci aplikace.
-
-## Akceptační kritéria
+## Akceptace
 
 1. `npm test` a `npm run build` projdou.
-2. Nepřihlášený klient nedostane seznam vlastních návštěv ani možnost zápisu.
-3. Přesnost nad 20 m, zastaralá poloha nebo `vzdálenost + přesnost > 20 m` skryje nabídku potvrzení a server zápis odmítne.
-4. Opakované potvrzení stejného bodu nepřidá druhý záznam.
-5. Po doplnění správného Google Sheetu, Script Properties a URL nasazení aplikace funguje přes HTTPS v mobilním prohlížeči.
+2. E-mailový odkaz dokončí přihlášení i na jiném zařízení po opětovném zadání e-mailu.
+3. Nepřihlášený uživatel nečte body ani návštěvy. Přihlášený čte jen vlastní návštěvy.
+4. Vzdálenou, nepřesnou, zastaralou a duplicitní návštěvu Firestore odmítne.
+5. Veřejný web běží na Firebase Hosting přes HTTPS a načítá skutečné body.
 
-## Před nasazením
-
-Zdrojové ID je `1jG4mLIO_Suk0x8Kqk-eZRIJ7nGcxXwtzfFzl-RUCE0I`. Samostatný Firestore projekt `svatomartinske-putovani` a databáze `(default)` v regionu `europe-central2` jsou vytvořené; produkční pravidla zakazují přímý klientský přístup. Nasaď Apps Script, nastav `FIRESTORE_PROJECT_ID=svatomartinske-putovani` a `AUTH_PEPPER`, doplň veřejnou URL do `config.js`, ověř tok e-mailu a průchod skutečnou trasou. Publikování hostingu a Apps Scriptu je samostatný provozní krok.
+Viz `README.md` pro provozní postup. GPS z prohlížeče lze zfalšovat; systém není důkazem fyzické přítomnosti.
