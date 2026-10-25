@@ -2,6 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.1.0/firebas
 import { getAuth, onAuthStateChanged, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { visitEligibility } from './geo.js';
+import { pointMarkerStyle } from './point-style.js';
 
 const config = window.SVATOMARTINSKE_CONFIG || {};
 const $ = id => document.getElementById(id);
@@ -42,7 +43,7 @@ function render() {
       else {const reason=document.createElement('p');reason.className='reason';reason.textContent=eligibility.reason;item.append(reason);}
     }
     list.append(item);
-    const marker=L.marker([point.lat,point.lng]).addTo(state.map).bindPopup(`<strong>${escapeHtml(point.name)}</strong><br>${visited?'Navštíveno':'Zatím nenavštíveno'}`);
+    const marker=L.circleMarker([point.lat,point.lng],pointMarkerStyle(visited)).addTo(state.map).bindPopup(`<strong>${escapeHtml(point.name)}</strong><br>${visited?'✓ Navštíveno':'Zatím nenavštíveno'}`);
     marker.on('click',()=>item.scrollIntoView({behavior:'smooth',block:'nearest'}));
     state.markers.push(marker);bounds.push([point.lat,point.lng]);
   }

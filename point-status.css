@@ -1,0 +1,30 @@
+.map-legend {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 0 18px 14px;
+  color: #52635b;
+  font-size: 13px;
+}
+
+.map-legend span {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.legend-dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #d5cdbf;
+}
+
+.legend-dot.unvisited {
+  background: #a74932;
+}
+
+.legend-dot.visited {
+  background: #277451;
+}

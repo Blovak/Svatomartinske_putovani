@@ -8,6 +8,7 @@
   <title>Svatomartinské putování</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./point-status.css">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script defer src="./config.js"></script>
   <script type="module" src="./app.js"></script>
@@ -22,7 +23,7 @@
       <div id="email-step"><h2>Začněte ověřením e-mailu</h2><p>Pošleme vám přihlašovací odkaz.</p><form id="email-form"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" maxlength="254" required><button type="submit">Poslat odkaz</button></form></div>
       <div id="link-step" hidden><h2>Dokončete přihlášení</h2><p>Zadejte e-mail, na který přišel přihlašovací odkaz.</p><form id="link-form"><label for="link-email">E-mail</label><input id="link-email" type="email" autocomplete="email" maxlength="254" required><button type="submit">Přihlásit se</button></form></div>
     </section>
-    <section id="content" hidden><div class="layout"><div class="map-wrap card"><div class="map-heading"><div><h2>Mapa zastavení</h2><p id="location-info">Čekám na polohu…</p></div><button id="locate" class="secondary">Moje poloha</button></div><div id="map" aria-label="Mapa míst putování"></div><p class="map-foot">Poloha slouží k nabídce potvrzení. Přesnost GPS se může měnit.</p></div><aside class="side"><div class="card"><div class="section-heading"><h2>Zastavení</h2><span id="point-count"></span></div><div id="points"></div></div></aside></div></section>
+    <section id="content" hidden><div class="layout"><div class="map-wrap card"><div class="map-heading"><div><h2>Mapa zastavení</h2><p id="location-info">Čekám na polohu…</p></div><button id="locate" class="secondary">Moje poloha</button></div><div class="map-legend" aria-label="Legenda mapy"><span><i class="legend-dot unvisited" aria-hidden="true"></i>Nenavštíveno</span><span><i class="legend-dot visited" aria-hidden="true"></i>Navštíveno</span></div><div id="map" aria-label="Mapa míst putování"></div><p class="map-foot">Poloha slouží k nabídce potvrzení. Přesnost GPS se může měnit.</p></div><aside class="side"><div class="card"><div class="section-heading"><h2>Zastavení</h2><span id="point-count"></span></div><div id="points"></div></div></aside></div></section>
   </main>
   <footer>Mapová data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. Pro zobrazení mapy je potřeba internet.</footer>
 </body></html>
