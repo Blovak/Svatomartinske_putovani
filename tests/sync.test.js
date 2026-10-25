@@ -13,7 +13,29 @@ test('zdrojový řádek vytvoří bod a metrech za stupeň délky', () => {
   assert.equal(p.lat, 49.9699433);
   assert.equal(context.parsePoint_(['neplatné', 'Bod']), null);
 });
-test('soubor synchronizace nemá veřejný vstup', () => {
-  assert.equal(typeof context.doGet, 'undefined');
-  assert.equal(typeof context.doPost, 'undefined');
+test('Apps Script vystavuje vstupy pro číselný kód a relaci', () => {
+  assert.equal(typeof context.doGet, 'function');
+  assert.equal(typeof context.doPost, 'function');
+});
+test('role jsou omezené na user a admin', () => {
+  assert.equal(context.normalizeRole_('admin'), 'admin');
+  assert.equal(context.normalizeRole_(' ADMIN '), 'admin');
+  assert.equal(context.normalizeRole_('owner'), 'user');
+  assert.equal(context.normalizeRole_(''), 'user');
+});
+test('záhlaví uživatelské tabulky toleruje diakritiku a mezery', () => {
+  assert.equal(context.normalizeHeader_(' Typ účtu '), 'typ uctu');
+  assert.equal(context.normalizeHeader_('Datum   registrace'), 'datum registrace');
+});
+test('ověřovací request ID musí být dostatečně dlouhé a bezpečné', () => {
+  assert.equal(context.normalizeVerificationRequestId_('verify_1234567890abcdef'), 'verify_1234567890abcdef');
+  assert.equal(context.normalizeVerificationRequestId_('verify_short'), '');
+});
+test('server odmítne starou, nepřesnou a vzdálenou návštěvu', () => {
+  const now = Date.now();
+  const point = { lat: 49.9699433, lng: 14.6600078, lonMPerDeg: 71465 };
+  assert.equal(context.visitIsEligible_(point, { measuredAtMs: now, lat: point.lat, lng: point.lng, accuracy: 5 }, now), true);
+  assert.equal(context.visitIsEligible_(point, { measuredAtMs: now - 31000, lat: point.lat, lng: point.lng, accuracy: 5 }, now), false);
+  assert.equal(context.visitIsEligible_(point, { measuredAtMs: now, lat: point.lat, lng: point.lng, accuracy: 21 }, now), false);
+  assert.equal(context.visitIsEligible_(point, { measuredAtMs: now, lat: point.lat + 0.001, lng: point.lng, accuracy: 5 }, now), false);
 });

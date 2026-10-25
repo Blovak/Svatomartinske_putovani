@@ -1,4 +1,5 @@
 dist/
+.firebase/
 .env
 .env.*
 !.env.example
