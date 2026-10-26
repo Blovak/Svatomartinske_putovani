@@ -2,6 +2,8 @@ const CONFIG = Object.freeze({
   pointsSpreadsheetId: '1jG4mLIO_Suk0x8Kqk-eZRIJ7nGcxXwtzfFzl-RUCE0I',
   usersSpreadsheetId: '1TEfbxeO5gwPBgJc2N9VTGpBcZAAzKwCmS1UcWcLJ-pI',
   firestoreProjectId: 'svatomartinske-putovani',
+  visitsSheet: 'Navstevy',
+  visitsSyncMinutes: 5,
   usersSheet: 'Users',
   otpLifetimeMs: 10 * 60 * 1000,
   otpResendMs: 60 * 1000,
@@ -250,6 +252,56 @@ function syncPoints() {
   console.log('Synchronizováno ' + points.size + ' míst.');
 }
 
+function syncVisitsBackup() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return 'Záloha návštěv přeskočena: právě běží jiná úloha.';
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const sheetId = props.getProperty('POINTS_SPREADSHEET_ID') || CONFIG.pointsSpreadsheetId;
+    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName(CONFIG.visitsSheet);
+    if (!sheet) throw new Error('Chybí list ' + CONFIG.visitsSheet + '.');
+    validateVisitsHeader_(sheet);
+
+    const pointsById = {};
+    firestoreList_('points').forEach(function(point) {
+      pointsById[String(point.__id || '')] = point;
+    });
+    const rows = visitsBackupRows_(firestoreCollectionGroup_('visits'), pointsById);
+    const oldRows = Math.max(0, sheet.getLastRow() - 1);
+    if (oldRows) sheet.getRange(2, 1, oldRows, 3).clearContent();
+    if (rows.length) {
+      sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+      sheet.getRange(2, 3, rows.length, 1).setNumberFormat('dd.MM.yyyy HH:mm:ss');
+    }
+    sheet.setFrozenRows(1);
+    props.setProperty('VISITS_BACKUP_SYNCED_AT', String(Date.now()));
+    return 'Záloha návštěv dokončena: ' + rows.length + ' záznamů.';
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function visitsBackupRows_(visits, pointsById) {
+  return (visits || []).filter(function(visit) {
+    return Boolean(asDate_(visit.visitedAt));
+  }).sort(function(a, b) {
+    return asDate_(a.visitedAt).getTime() - asDate_(b.visitedAt).getTime() ||
+      String(a.email || '').localeCompare(String(b.email || '')) ||
+      String(a.pointId || '').localeCompare(String(b.pointId || ''));
+  }).map(function(visit) {
+    const pointId = String(visit.pointId || visit.__id || '');
+    const point = pointsById[pointId] || {};
+    return [String(visit.email || ''), String(point.name || pointId), asDate_(visit.visitedAt)];
+  });
+}
+
+function validateVisitsHeader_(sheet) {
+  const header = sheet.getRange(1, 1, 1, 3).getDisplayValues()[0].map(normalizeHeader_);
+  if (header[0] !== 'user' || header[1] !== 'popis bodu' || header[2] !== 'datum a cas navstevy') {
+    throw new Error('Neplatné záhlaví listu ' + CONFIG.visitsSheet + '.');
+  }
+}
+
 function parsePoint_(row) {
   const position = String(row[0] || '').trim(), name = String(row[1] || '').trim();
   const match = position.match(/^(\d{1,2}(?:\.\d+)?)\s*([NS])\s*,\s*(\d{1,3}(?:\.\d+)?)\s*([EW])$/i);
@@ -262,6 +314,14 @@ function parsePoint_(row) {
 function installHourlyTrigger() {
   ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction() === 'syncPoints'; }).forEach(function(t) { ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('syncPoints').timeBased().everyHours(1).create();
+}
+
+function installVisitsBackupTrigger() {
+  ScriptApp.getProjectTriggers().filter(function(t) {
+    return t.getHandlerFunction() === 'syncVisitsBackup';
+  }).forEach(function(t) { ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('syncVisitsBackup').timeBased().everyMinutes(CONFIG.visitsSyncMinutes).create();
+  return 'Záloha návštěv je naplánována každých ' + CONFIG.visitsSyncMinutes + ' minut.';
 }
 
 function authorizeApplication() {
@@ -298,6 +358,15 @@ function firestoreList_(collectionPath) {
     pageToken = r.body.nextPageToken || '';
   } while (pageToken);
   return result;
+}
+
+function firestoreCollectionGroup_(collectionId) {
+  const r = firestoreRequest_('post', firestoreBaseUrl_() + ':runQuery', {
+    structuredQuery:{from:[{collectionId:String(collectionId), allDescendants:true}]}
+  });
+  return (r.body || []).filter(function(item) { return item.document; }).map(function(item) {
+    return decodeDocument_(item.document);
+  });
 }
 
 function firestoreRequest_(method, url, payload, allowed) {

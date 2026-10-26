@@ -39,3 +39,23 @@ test('server odmítne starou, nepřesnou a vzdálenou návštěvu', () => {
   assert.equal(context.visitIsEligible_(point, { measuredAtMs: now, lat: point.lat, lng: point.lng, accuracy: 21 }, now), false);
   assert.equal(context.visitIsEligible_(point, { measuredAtMs: now, lat: point.lat + 0.001, lng: point.lng, accuracy: 5 }, now), false);
 });
+test('záloha návštěv obsahuje uživatele, popis bodu a čas a je chronologická', () => {
+  const earlier = new Date('2026-10-26T08:00:00.000Z');
+  const later = new Date('2026-10-26T09:00:00.000Z');
+  const rows = context.visitsBackupRows_([
+    { pointId: 'b', email: 'b@example.cz', visitedAt: later },
+    { pointId: 'a', email: 'a@example.cz', visitedAt: earlier }
+  ], {
+    a: { name: 'První bod' },
+    b: { name: 'Druhý bod' }
+  });
+  assert.equal(rows.length, 2);
+  assert.deepEqual(Array.from(rows[0]), ['a@example.cz', 'První bod', earlier]);
+  assert.deepEqual(Array.from(rows[1]), ['b@example.cz', 'Druhý bod', later]);
+});
+test('Apps Script obsahuje pětiminutový trigger zálohy návštěv', () => {
+  assert.equal(vm.runInContext('CONFIG.visitsSheet', context), 'Navstevy');
+  assert.equal(vm.runInContext('CONFIG.visitsSyncMinutes', context), 5);
+  assert.equal(typeof context.syncVisitsBackup, 'function');
+  assert.equal(typeof context.installVisitsBackupTrigger, 'function');
+});
