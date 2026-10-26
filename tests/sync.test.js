@@ -59,3 +59,14 @@ test('Apps Script obsahuje pětiminutový trigger zálohy návštěv', () => {
   assert.equal(typeof context.syncVisitsBackup, 'function');
   assert.equal(typeof context.installVisitsBackupTrigger, 'function');
 });
+test('aktivní poloha přijme jen čerstvé a přiměřeně přesné měření', () => {
+  const now = Date.now();
+  assert.equal(context.activeLocationIsValid_({measuredAtMs:now, lat:49.9, lng:14.7, accuracyM:25}, now), true);
+  assert.equal(context.activeLocationIsValid_({measuredAtMs:now - 31000, lat:49.9, lng:14.7, accuracyM:25}, now), false);
+  assert.equal(context.activeLocationIsValid_({measuredAtMs:now, lat:49.9, lng:14.7, accuracyM:101}, now), false);
+  assert.equal(context.activeLocationIsValid_({measuredAtMs:now, lat:91, lng:14.7, accuracyM:25}, now), false);
+});
+test('backend vystavuje administrátorský přehled aktivních poloh', () => {
+  assert.equal(typeof context.updateActiveLocation_, 'function');
+  assert.equal(typeof context.adminActiveLocationsResponse_, 'function');
+});

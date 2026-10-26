@@ -9,7 +9,9 @@ const $ = id => document.getElementById(id);
 const state = {
   sessionToken:localStorage.getItem(SESSION_KEY) || '', email:localStorage.getItem(EMAIL_KEY) || '',
   role:'', points:[], visits:new Set(), fix:null, map:null, markers:[], userMarker:null,
-  accuracyCircle:null, watchId:null, boundsFitted:false, verificationRequestId:'', verificationRequestKey:''
+  accuracyCircle:null, watchId:null, boundsFitted:false, verificationRequestId:'', verificationRequestKey:'',
+  locationHeartbeatId:null, locationPublishAttemptAt:0, locationPublishPending:false,
+  adminLive:false, participantMarkers:[], participantRefreshId:null, participantBoundsFitted:false
 };
 
 function status(message, error=false) { $('status').textContent=message; $('status').classList.toggle('error',error); }
@@ -34,6 +36,7 @@ function showAuth(step='email') {
 function showContent() {
   $('auth').hidden=true; $('content').hidden=false; $('logout').hidden=false; $('identity').hidden=false;
   $('identity').textContent=(state.role === 'admin' ? 'Administrátor · ' : '') + state.email;
+  $('admin-actions').hidden=state.role !== 'admin';
   setTimeout(()=>state.map?.invalidateSize(),0);
 }
 
@@ -82,6 +85,7 @@ function render() {
 
 function startLocation() {
   if(!navigator.geolocation){$('location-info').textContent='Toto zařízení nepodporuje geolokaci.';return;}
+  startLocationHeartbeat();
   if(state.watchId!=null)return;
   state.watchId=navigator.geolocation.watchPosition(position=>{
     const {latitude:lat,longitude:lng,accuracy}=position.coords;
@@ -91,8 +95,27 @@ function startLocation() {
       state.userMarker=L.circleMarker([lat,lng],{radius:8,color:'#fff',weight:3,fillColor:'#267eb8',fillOpacity:1}).addTo(state.map);
       state.accuracyCircle=L.circle([lat,lng],{radius:accuracy,color:'#267eb8',weight:1,fillOpacity:.08}).addTo(state.map);
     } else { state.userMarker.setLatLng([lat,lng]); state.accuracyCircle.setLatLng([lat,lng]).setRadius(accuracy); }
+    publishCurrentLocation();
     render();
   },error=>{$('location-info').textContent=error.code===1?'Povolte přístup k poloze v prohlížeči.':'Polohu se nepodařilo získat.';state.fix=null;render();},{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+}
+
+async function publishCurrentLocation() {
+  const fix=state.fix, now=Date.now();
+  if(!state.sessionToken||!fix||document.hidden||state.locationPublishPending)return;
+  if(now-fix.timestamp>30000||now-state.locationPublishAttemptAt<12000)return;
+  state.locationPublishAttemptAt=now; state.locationPublishPending=true;
+  try {
+    const data=await apiPost({action:'locationUpdate',sessionToken:state.sessionToken,measuredAt:String(fix.timestamp),lat:String(fix.lat),lng:String(fix.lng),accuracyM:String(fix.accuracy)});
+    if(data.status==='ERROR'&&data.error==='UNAUTHORIZED')clearSession();
+  } catch(_) {
+    // Sdílení aktuální polohy nesmí blokovat hlavní funkce aplikace.
+  } finally { state.locationPublishPending=false; }
+}
+
+function startLocationHeartbeat() {
+  if(state.locationHeartbeatId!=null)return;
+  state.locationHeartbeatId=setInterval(publishCurrentLocation,15000);
 }
 
 async function confirmVisit(point,button) {
@@ -138,11 +161,72 @@ $('resend').onclick=()=>{$('email-form').requestSubmit();};
 $('change-email').onclick=()=>{showAuth('email');status('');};
 $('logout').onclick=async()=>{try{await apiPost({action:'logout',sessionToken:state.sessionToken});}catch(_){}clearSession();status('Byli jste odhlášeni.');};
 $('locate').onclick=()=>{if(state.fix)state.map.setView([state.fix.lat,state.fix.lng],17);else startLocation();};
+$('admin-live').onclick=()=>{if(state.adminLive)exitAdminLive();else enterAdminLive();};
+
+async function enterAdminLive() {
+  if(state.role!=='admin')return;
+  state.adminLive=true; state.participantBoundsFitted=false;
+  $('admin-live').textContent='Zpět na zastavení';
+  $('map-title').textContent='Aktivní účastníci';
+  $('points-panel').hidden=true; $('participants-panel').hidden=false; $('participant-legend').hidden=false;
+  await loadActiveParticipants();
+  if(state.adminLive&&state.participantRefreshId==null)state.participantRefreshId=setInterval(loadActiveParticipants,15000);
+}
+
+function exitAdminLive() {
+  state.adminLive=false;
+  if(state.participantRefreshId!=null)clearInterval(state.participantRefreshId);
+  state.participantRefreshId=null; clearParticipantMarkers();
+  $('admin-live').textContent='Zobrazit aktivní účastníky';
+  $('map-title').textContent='Mapa zastavení';
+  $('points-panel').hidden=false; $('participants-panel').hidden=true; $('participant-legend').hidden=true;
+}
+
+async function loadActiveParticipants() {
+  if(!state.adminLive||state.role!=='admin')return;
+  try {
+    const data=await apiPostWithRetry({action:'adminActiveLocations',sessionToken:state.sessionToken});
+    if(data.status!=='OK')throw new Error(data.error||'SERVER_ERROR');
+    renderActiveParticipants(data.locations||[]);
+  } catch(error) {
+    if(error.message==='UNAUTHORIZED')clearSession();
+    else if(error.message==='FORBIDDEN'){state.role='user';exitAdminLive();$('admin-actions').hidden=true;}
+    status(explain(error.message),true);
+  }
+}
+
+function clearParticipantMarkers() {
+  for(const layer of state.participantMarkers)layer.remove();
+  state.participantMarkers=[];
+}
+
+function renderActiveParticipants(locations) {
+  clearParticipantMarkers();
+  const list=$('participants'); list.replaceChildren();
+  $('participant-count').textContent=String(locations.length);
+  const bounds=[];
+  for(const participant of locations) {
+    const updated=new Date(participant.updatedAt), ageSeconds=Math.max(0,Math.round((Date.now()-updated.getTime())/1000));
+    const row=document.createElement('article'); row.className='participant-row';
+    const title=document.createElement('h3'); title.textContent=participant.email||'Účastník';
+    const meta=document.createElement('p'); meta.textContent=`Aktualizováno před ${ageSeconds} s · přesnost ±${Math.round(participant.accuracyM||0)} m`;
+    const button=document.createElement('button'); button.className='secondary'; button.type='button'; button.textContent='Ukázat na mapě';
+    button.onclick=()=>state.map.setView([participant.lat,participant.lng],17);
+    row.append(title,meta,button); list.append(row);
+    const accuracy=L.circle([participant.lat,participant.lng],{radius:Math.max(1,Number(participant.accuracyM)||0),color:'#6a3da8',weight:1,fillColor:'#8b5fc7',fillOpacity:.08}).addTo(state.map);
+    const marker=L.circleMarker([participant.lat,participant.lng],{radius:9,color:'#fff',weight:3,fillColor:'#6a3da8',fillOpacity:1}).addTo(state.map)
+      .bindPopup(`<strong>${escapeHtml(participant.email||'Účastník')}</strong><br>Aktualizováno před ${ageSeconds} s`);
+    state.participantMarkers.push(accuracy,marker); bounds.push([participant.lat,participant.lng]);
+  }
+  if(!locations.length){const empty=document.createElement('p');empty.className='participant-note';empty.textContent='Momentálně není aktivní žádný účastník.';list.append(empty);}
+  if(bounds.length&&!state.participantBoundsFitted){state.map.fitBounds(bounds,{padding:[40,40],maxZoom:16});state.participantBoundsFitted=true;}
+}
 
 function clearSession() {
   state.sessionToken='';state.role='';localStorage.removeItem(SESSION_KEY);
   if(state.watchId!=null)navigator.geolocation.clearWatch(state.watchId);
-  state.watchId=null;state.fix=null;showAuth('email');
+  if(state.locationHeartbeatId!=null)clearInterval(state.locationHeartbeatId);
+  state.locationHeartbeatId=null;state.watchId=null;state.fix=null;exitAdminLive();$('admin-actions').hidden=true;showAuth('email');
 }
 
 async function restoreSession() {
@@ -180,4 +264,5 @@ if(state.email)$('email').value=state.email;
 if(!API_URL){$('setup').hidden=false;showAuth('email');}
 else if(state.sessionToken)restoreSession();
 else showAuth('email');
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)publishCurrentLocation();});
 setInterval(()=>{if(state.map&&state.fix)render();},3000);

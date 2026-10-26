@@ -4,6 +4,8 @@ const CONFIG = Object.freeze({
   firestoreProjectId: 'svatomartinske-putovani',
   visitsSheet: 'Navstevy',
   visitsSyncMinutes: 5,
+  activeLocationLifetimeMs: 2 * 60 * 1000,
+  activeLocationMaxAccuracyM: 100,
   usersSheet: 'Users',
   otpLifetimeMs: 10 * 60 * 1000,
   otpResendMs: 60 * 1000,
@@ -27,6 +29,8 @@ function doPost(e) {
       case 'session': return sessionInfo_(data.sessionToken);
       case 'data': return dataResponse_(data.sessionToken);
       case 'visit': return recordVisit_(data.sessionToken, data.pointId, data.measuredAt, data.lat, data.lng, data.accuracyM);
+      case 'locationUpdate': return updateActiveLocation_(data.sessionToken, data.measuredAt, data.lat, data.lng, data.accuracyM);
+      case 'adminActiveLocations': return adminActiveLocationsResponse_(data.sessionToken);
       case 'adminUsers': return adminUsersResponse_(data.sessionToken);
       case 'logout': return logout_(data.sessionToken);
       default: return json_({status:'ERROR', error:'UNKNOWN_ACTION'});
@@ -169,11 +173,60 @@ function adminUsersResponse_(token) {
   return json_(access.user.role === 'admin' ? {status:'OK', users:listUsers_()} : {status:'ERROR', error:'FORBIDDEN'});
 }
 
+function updateActiveLocation_(token, rawMeasuredAt, rawLat, rawLng, rawAccuracy) {
+  const access = requireAccess_(token);
+  if (!access) return json_({status:'ERROR', error:'UNAUTHORIZED'});
+  const measuredAtMs = Number(rawMeasuredAt), lat = Number(rawLat), lng = Number(rawLng);
+  const accuracyM = Number(rawAccuracy), now = new Date();
+  if (!activeLocationIsValid_({measuredAtMs:measuredAtMs, lat:lat, lng:lng, accuracyM:accuracyM}, now.getTime())) {
+    return json_({status:'ERROR', error:'INVALID_LOCATION'});
+  }
+  firestoreSet_('activeLocations/' + access.session.userId, {
+    userId:access.session.userId, email:access.session.email, role:access.user.role,
+    lat:lat, lng:lng, accuracyM:accuracyM, measuredAt:new Date(measuredAtMs), updatedAt:now
+  });
+  return json_({status:'OK'});
+}
+
+function activeLocationIsValid_(location, nowMs) {
+  const age = Number(nowMs) - Number(location.measuredAtMs);
+  return isFinite(age) && age >= -2000 && age <= 30000 &&
+    isFinite(location.lat) && location.lat >= -90 && location.lat <= 90 &&
+    isFinite(location.lng) && location.lng >= -180 && location.lng <= 180 &&
+    isFinite(location.accuracyM) && location.accuracyM >= 0 &&
+    location.accuracyM <= CONFIG.activeLocationMaxAccuracyM;
+}
+
+function adminActiveLocationsResponse_(token) {
+  const access = requireAccess_(token);
+  if (!access) return json_({status:'ERROR', error:'UNAUTHORIZED'});
+  if (access.user.role !== 'admin') return json_({status:'ERROR', error:'FORBIDDEN'});
+  const nowMs = Date.now();
+  const locations = firestoreList_('activeLocations').filter(function(location) {
+    const updatedAt = asDate_(location.updatedAt);
+    return updatedAt && nowMs - updatedAt.getTime() <= CONFIG.activeLocationLifetimeMs;
+  }).map(function(location) {
+    return {
+      email:String(location.email || ''), lat:Number(location.lat), lng:Number(location.lng),
+      accuracyM:Number(location.accuracyM) || 0,
+      updatedAt:(asDate_(location.updatedAt) || new Date(0)).toISOString()
+    };
+  }).filter(function(location) {
+    return isFinite(location.lat) && isFinite(location.lng);
+  }).sort(function(a, b) {
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+  return json_({status:'OK', locations:locations, activeWithinSeconds:CONFIG.activeLocationLifetimeMs / 1000});
+}
+
 function logout_(rawToken) {
   const token = String(rawToken || '');
   if (token.length >= 40 && token.length <= 200) {
     const path = 'sessions/' + hash_('session:' + token), session = firestoreGet_(path);
-    if (session) { session.revokedAt = new Date(); firestoreSet_(path, session); }
+    if (session) {
+      session.revokedAt = new Date(); firestoreSet_(path, session);
+      if (session.userId) firestoreDelete_('activeLocations/' + String(session.userId));
+    }
   }
   return json_({status:'OK'});
 }
@@ -344,6 +397,8 @@ function firestoreGet_(path) {
 }
 
 function firestoreSet_(path, data) { firestoreRequest_('patch', firestorePathUrl_(path), {fields:encodeFields_(data)}); }
+
+function firestoreDelete_(path) { firestoreRequest_('delete', firestorePathUrl_(path), null, [404]); }
 
 function firestoreCreate_(collectionPath, documentId, data) {
   const r = firestoreRequest_('post', firestorePathUrl_(collectionPath) + '?documentId=' + encodeURIComponent(documentId), {fields:encodeFields_(data)}, [409]);

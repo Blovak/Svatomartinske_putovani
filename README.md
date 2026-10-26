@@ -17,6 +17,8 @@ Apps Script přijímá e-mail, vytvoří šestimístný kód s platností 10 min
 
 Veškeré čtení bodů, vlastních návštěv a zápis návštěvy probíhá přes Apps Script s ověřenou relací. Firestore pravidla proto zakazují veškerý přímý klientský přístup. Server znovu kontroluje stáří měření do 30 sekund, přesnost nejvýše 20 metrů a podmínku `vzdálenost + přesnost ≤ 20 m`. Přesná poloha návštěvy je osobní údaj; provozovatel musí určit dobu uchování a mazání. GPS z prohlížeče lze zfalšovat.
 
+Přihlášená aplikace odesílá nejvýše jednou za 15 sekund poslední čerstvou polohu do `activeLocations`. Administrátor může v aplikaci zobrazit účastníky aktualizované během posledních dvou minut. Backend kontroluje roli `admin`; běžný uživatel cizí polohy nezíská. Ukládá se pouze poslední poloha, při odhlášení se odstraní a starší záznamy se nezobrazují.
+
 ## Nasazení
 
 1. V existujícím Apps Script projektu nahrajte `apps-script/Code.gs` a `apps-script/appsscript.json`.
