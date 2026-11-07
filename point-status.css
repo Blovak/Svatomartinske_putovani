@@ -21,10 +21,10 @@
   box-shadow: 0 0 0 1px #d5cdbf;
 }
 
-.legend-dot.unvisited {
+.legend-dot.point-location {
   background: #a74932;
 }
 
-.legend-dot.visited {
-  background: #277451;
+.legend-dot.user-location {
+  background: #267eb8;
 }

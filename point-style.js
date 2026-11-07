@@ -1,9 +1,9 @@
-export function pointMarkerStyle(visited) {
+export function pointMarkerStyle() {
   return {
     radius: 11,
     color: '#ffffff',
     weight: 3,
-    fillColor: visited ? '#277451' : '#a74932',
+    fillColor: '#a74932',
     fillOpacity: 1
   };
 }
