@@ -1,6 +1,6 @@
 # Zadání pro Codex: Svatomartinské putování
 
-Udržuj veřejný mobilní web v repozitáři `Blovak/Svatomartinske_putovani`. Web bez přihlášení zobrazuje místa na mapě OpenStreetMap a aktuální polohu návštěvníka.
+Udržuj veřejný mobilní web v repozitáři `Blovak/Svatomartinske_putovani`. Web bez přihlášení zobrazuje místa na celoobrazovkové mapě OpenStreetMap a aktuální polohu návštěvníka.
 
 ## Data a chování
 
@@ -13,7 +13,7 @@ Udržuj veřejný mobilní web v repozitáři `Blovak/Svatomartinske_putovani`. 
 ## Akceptace
 
 1. `npm test` a `npm run build` projdou.
-2. Mapa zobrazí všechny platné body z veřejného API.
+2. Celoobrazovková mapa bez vnějších okrajů zobrazí všechny platné body z veřejného API.
 3. Po udělení oprávnění se zobrazí aktuální poloha a kruh její přesnosti.
 4. Tlačítko **Moje poloha** vystředí mapu na uživatele.
 5. Web neobsahuje přihlášení, relace, návštěvy ani odesílání polohy.

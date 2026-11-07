@@ -14,7 +14,8 @@ function status(message, error = false) {
 }
 
 function initMap() {
-  state.map = L.map('map', { scrollWheelZoom: false }).setView([49.9, 15.3], 7);
+  state.map = L.map('map', { scrollWheelZoom: false, zoomControl: false }).setView([49.9, 15.3], 7);
+  L.control.zoom({ position: 'bottomright' }).addTo(state.map);
   L.tileLayer(config.tileUrl || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'

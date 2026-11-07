@@ -1,6 +1,6 @@
 # Svatomartinské putování
 
-Veřejný mobilní web s mapou OpenStreetMap, místy putování a aktuální polohou návštěvníka. Aplikace nevyžaduje přihlášení, neeviduje návštěvy a polohu uživatele nikam neodesílá.
+Veřejný mobilní web s celoobrazovkovou mapou OpenStreetMap, místy putování a aktuální polohou návštěvníka. Aplikace nevyžaduje přihlášení, neeviduje návštěvy a polohu uživatele nikam neodesílá.
 
 ## Data
 
