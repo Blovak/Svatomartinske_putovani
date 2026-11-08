@@ -2,6 +2,8 @@
 
 Veřejný mobilní web s celoobrazovkovou mapou OpenStreetMap, místy putování a aktuální polohou návštěvníka. Aplikace nevyžaduje přihlášení, neeviduje návštěvy a polohu uživatele nikam neodesílá.
 
+Při prvním otevření se zobrazí nápověda s popisem Svatomartinské stezky. Po zavření si prohlížeč zapamatuje její přečtení v místním úložišti. Tlačítkem **Nápověda** ji lze kdykoli otevřít znovu. Při zakázaném úložišti se zobrazí při každém otevření stránky.
+
 ## Data
 
 - [Zdroj bodů](https://docs.google.com/spreadsheets/d/1jG4mLIO_Suk0x8Kqk-eZRIJ7nGcxXwtzfFzl-RUCE0I/edit), list `GPS body`, sloupce `Poloha` a `Popis`.

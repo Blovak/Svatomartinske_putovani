@@ -31,6 +31,46 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+.help-open {
+  position: fixed;
+  z-index: 1000;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(80px, calc(env(safe-area-inset-bottom) + 68px));
+  box-shadow: 0 8px 28px rgb(38 61 54 / 18%);
+}
+
+.help-dialog {
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid #e2d7c3;
+  border-radius: 20px;
+  background: #fffaf0;
+  color: #263d36;
+  box-shadow: 0 16px 60px rgb(0 0 0 / 30%);
+  overflow-y: auto;
+}
+
+.help-dialog::backdrop {
+  background: rgb(20 35 30 / 65%);
+}
+
+.help-content { padding: 24px 24px 0; }
+.help-content h2 { margin: 0 0 20px; font-size: 25px; line-height: 1.2; }
+.help-content h3 { margin: 24px 0 8px; font-size: 18px; line-height: 1.3; }
+.help-content p { margin: 0 0 16px; line-height: 1.6; }
+.help-actions {
+  display: grid;
+  gap: 10px;
+  position: sticky;
+  bottom: 0;
+  padding: 16px 24px 24px;
+  background: #fffaf0;
+}
+.help-actions button { width: 100%; white-space: normal; }
+.help-actions .help-secondary { background: #e8e1d4; color: #263d36; }
+
 #map {
   position: fixed;
   inset: 0;

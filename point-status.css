@@ -2,6 +2,8 @@
   bottom: max(24px, calc(env(safe-area-inset-bottom) + 12px));
   left: max(12px, env(safe-area-inset-left));
   display: flex;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 76px);
   align-items: center;
   gap: 16px;
   padding: 10px 13px;
@@ -27,6 +29,13 @@
 
 .legend-dot.point-location { background: #a74932; }
 .legend-dot.user-location { background: #267eb8; }
+
+.finish-marker svg {
+  display: block;
+  width: 36px;
+  height: 42px;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 35%));
+}
 
 @media (max-width: 390px) {
   .map-legend {

@@ -7,11 +7,12 @@
   <meta name="description" content="Mapa zastavení Svatomartinského putování">
   <title>Svatomartinské putování</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="./style.css?v=6">
-  <link rel="stylesheet" href="./point-status.css?v=4">
+  <link rel="stylesheet" href="./style.css?v=8">
+  <link rel="stylesheet" href="./point-status.css?v=5">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script defer src="./config.js?v=3"></script>
-  <script type="module" src="./app.js?v=6"></script>
+  <script type="module" src="./help.js?v=2"></script>
+  <script type="module" src="./app.js?v=7"></script>
 </head>
 <body>
   <div id="map" aria-label="Mapa míst putování"></div>
@@ -19,11 +20,45 @@
     <span class="brand-mark" aria-hidden="true">✦</span>
     <div><small>Podzimní cesta</small><h1>Svatomartinské putování</h1></div>
   </header>
+  <button id="help-open" class="help-open" type="button" aria-haspopup="dialog">Nápověda</button>
+  <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">
+    <div class="help-content">
+      <h2 id="help-title" tabindex="-1" autofocus>Svatomartinská stezka</h2>
+      <p>Na středu 11. 11. jsme pro vás připravili Svatomartinskou stezku po Světicích.</p>
+      <p>Vaším úkolem je posbírat deset podkůvek sv. Martina na stanovištích vyznačených na mapě. Je myšlena jedna podkova na rodinu nebo skupinu, která chodí pohromadě. V cíli je vyměníte za malý dárek.</p>
+      <p>Cíl je na cyklostezce „u čerta“.</p>
+      <p>Pro děti bude teplý čaj, dospělí by se měli zařídit sami, nejlépe nějakou termoskou.</p>
+      <p>Ideálně kdybyste cestu absolvovali s lucernou nebo lampiónem pro hezčí atmosféru.</p>
+      <p>Stezka bude připravena od 17.00 hodin.</p>
+    </div>
+    <form method="dialog" class="help-actions">
+      <button id="controls-help-open" class="help-secondary" type="button" aria-haspopup="dialog">Jak ovládat mapu</button>
+      <button type="submit">Zavřít a zobrazit mapu</button>
+    </form>
+  </dialog>
+  <dialog id="controls-help-dialog" class="help-dialog" aria-labelledby="controls-help-title">
+    <div class="help-content">
+      <h2 id="controls-help-title" tabindex="-1" autofocus>Jak ovládat mapu</h2>
+      <h3>Pohyb a přiblížení mapy</h3>
+      <p>Mapu posunete tažením prstu po obrazovce nebo tažením myší. Na telefonu ji přiblížíte roztažením dvou prstů a oddálíte jejich přitažením k sobě. Použít můžete také tlačítka + a − vpravo dole.</p>
+      <h3>Stanoviště a cíl</h3>
+      <p>Hnědočervené kroužky označují stanoviště s podkůvkami. Klepnutím na kroužek zobrazíte název stanoviště. Šachovnicová vlaječka označuje cíl „U Čerta“, kde podkůvky vyměníte za dárek.</p>
+      <h3>Vaše poloha</h3>
+      <p>Prohlížeči povolte přístup k poloze. Modrý bod pak ukazuje, kde právě jste, a světlý kruh kolem něj znázorňuje přibližnou nepřesnost GPS. Čím je kruh menší, tím je poloha přesnější.</p>
+      <p>Tlačítkem <strong>Moje poloha</strong> vystředíte mapu na svou aktuální pozici. Jakmile se po spuštění objeví modrý bod, můžete toto tlačítko použít. Při chůzi se modrý bod průběžně aktualizuje.</p>
+      <h3>Když něco nefunguje</h3>
+      <p>Pokud se poloha nezobrazuje, zkontrolujte zapnutou polohu telefonu a oprávnění k poloze pro tuto stránku v prohlížeči. Venku bývá GPS přesnější; po změně oprávnění stránku obnovte.</p>
+      <p>Pro načtení mapy a stanovišť potřebujete připojení k internetu. Když se body nenačtou, zkontrolujte připojení a obnovte stránku.</p>
+      <h3>Opětovné otevření nápovědy</h3>
+      <p>Tlačítko <strong>Nápověda</strong> na mapě otevře informace o akci. V nich tlačítkem <strong>Jak ovládat mapu</strong> znovu zobrazíte tento návod. Vaše poloha zůstává pouze ve vašem zařízení.</p>
+    </div>
+    <form method="dialog" class="help-actions"><button type="submit">Zpět k informacím o akci</button></form>
+  </dialog>
   <section class="location-panel" aria-label="Ovládání polohy">
     <p id="location-info">Čekám na polohu…</p>
     <button id="locate" type="button">Moje poloha</button>
   </section>
-  <div class="map-legend" aria-label="Legenda mapy"><span><i class="legend-dot point-location" aria-hidden="true"></i>Místo putování</span><span><i class="legend-dot user-location" aria-hidden="true"></i>Vaše poloha</span></div>
+  <div class="map-legend" aria-label="Legenda mapy"><span><i class="legend-dot point-location" aria-hidden="true"></i>Místo putování</span><span><b aria-hidden="true">⚑</b>Cíl</span><span><i class="legend-dot user-location" aria-hidden="true"></i>Vaše poloha</span></div>
   <div id="status" role="status" aria-live="polite"></div>
   <section id="setup" class="notice" hidden><h2>Je potřeba doplnit připojení</h2><p>Správce musí nastavit URL nasazeného Apps Scriptu v souboru <code>config.js</code>. Postup je v README.</p></section>
 </body>

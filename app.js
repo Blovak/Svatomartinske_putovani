@@ -1,4 +1,4 @@
-import { pointMarkerStyle } from './point-style.js';
+import { pointMarkerStyle, isFinishPoint, finishMarkerHtml } from './point-style.js?v=2';
 
 const config = window.SVATOMARTINSKE_CONFIG || {};
 const API_URL = String(config.apiUrl || '').trim();
@@ -34,7 +34,14 @@ function renderPoints() {
   const bounds = [];
 
   for (const point of state.points) {
-    const marker = L.circleMarker([point.lat, point.lng], pointMarkerStyle()).addTo(state.map)
+    const position = [point.lat, point.lng];
+    const marker = (isFinishPoint(point)
+      ? L.marker(position, {
+        title: point.name,
+        keyboard: true,
+        icon: L.divIcon({ className: 'finish-marker', html: finishMarkerHtml, iconSize: [36, 42], iconAnchor: [7, 39], popupAnchor: [11, -35] })
+      })
+      : L.circleMarker(position, pointMarkerStyle())).addTo(state.map)
       .bindPopup(`<strong>${escapeHtml(point.name)}</strong>${point.description ? `<br>${escapeHtml(point.description)}` : ''}`);
     state.markers.push(marker);
     bounds.push([point.lat, point.lng]);
